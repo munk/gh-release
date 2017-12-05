@@ -1,0 +1,6 @@
+[package]
+name = "gh-release"
+version = "0.1.0"
+authors = ["munk <munk@protonmail.com>"]
+
+[dependencies]
