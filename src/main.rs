@@ -9,7 +9,7 @@ use reqwest::header;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use base64::{encode, decode};
+
 
 fn get_url<'a>(origin: &'a Remote) -> Vec<&'a str> {
     let url = origin.url().map(|s| s.split(":"));
@@ -29,9 +29,9 @@ fn get_repo_details(url: Vec<&str>) -> (&str, &str) {
     return (owner, project);
 }
 
-fn get_data(url: &str) -> Result<reqwest::Response, Box<std::error::Error>> {
+fn get_data(url: &str, auth: header::Basic) -> Result<reqwest::Response, Box<std::error::Error>> {
     let mut headers = header::Headers::new();
-    headers.set(header::Authorization("secret".to_string()));
+    let auth_header = header::Authorization(auth);
 
     let client = reqwest::Client::builder()
          .default_headers(headers)
@@ -47,7 +47,7 @@ fn read_line(mut reader: &mut BufReader<File>) -> String {
 }
 
 
-fn read_ghreleaseauth() -> String {
+fn read_ghreleaseauth() -> header::Basic {
     let mut home_dir: PathBuf = env::home_dir().expect("Cannot find config file!");
     home_dir.push(".ghreleaseauth");
     let file = File::open(home_dir).expect("Unable to open file ~/.ghreleaseauth");
@@ -55,7 +55,10 @@ fn read_ghreleaseauth() -> String {
     let username = read_line(&mut reader);
     let password = read_line(&mut reader);
 
-    return username + &String::from(":") + &password
+    return header::Basic {
+        username: username,
+        password: Some(password),
+    }
 }
 
 fn main() {
@@ -71,11 +74,10 @@ fn main() {
     let url = get_url(&origin);
     let (owner, project) = get_repo_details(url);
 
-    let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
-    let response = get_data(&target_url);
 
-    let auth_string = encode(&read_ghreleaseauth());
-    println!("file {:?}", auth_string);
+    let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
+    let auth_string = read_ghreleaseauth();
+    let response = get_data(&target_url, auth_string);
 
     println!("Hello! {}, {}, {:?}", owner, project, response)
 }
