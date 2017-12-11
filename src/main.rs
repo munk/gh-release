@@ -31,7 +31,7 @@ fn get_repo_details(url: Vec<&str>) -> (&str, &str) {
 
 fn get_data(url: &str, auth: header::Basic) -> Result<reqwest::Response, Box<std::error::Error>> {
     let mut headers = header::Headers::new();
-    let auth_header = header::Authorization(auth);
+    let _auth_header = header::Authorization(auth); // how does this even work?? Is it mutating headers?
 
     let client = reqwest::Client::builder()
          .default_headers(headers)
@@ -77,7 +77,10 @@ fn main() {
 
     let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
     let auth_string = read_ghreleaseauth();
-    let response = get_data(&target_url, auth_string);
+    let mut response = match get_data(&target_url, auth_string) {
+        Ok(response) => response,
+        Err(e) => panic!("Unable to reach github: {}", e),
+    };
 
-    println!("Hello! {}, {}, {:?}", owner, project, response)
+    println!("Hello! {}, {}, {:?}", owner, project, response.text())
 }
