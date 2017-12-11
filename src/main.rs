@@ -9,7 +9,7 @@ use reqwest::header;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
+use std::collections::HashMap;
 
 fn get_url<'a>(origin: &'a Remote) -> Vec<&'a str> {
     let url = origin.url().map(|s| s.split(":"));
@@ -29,9 +29,26 @@ fn get_repo_details(url: Vec<&str>) -> (&str, &str) {
     return (owner, project);
 }
 
+fn create_release(url: &str, auth: header::Basic) -> Result<reqwest::Response, Box<std::error::Error>> {
+    let mut headers = header::Headers::new();
+    headers.set(header::Authorization(auth));
+
+    let mut body = HashMap::new();
+    body.insert("tag_name", "v0.0.1");
+    body.insert("name", "v0.0.1");
+    body.insert("commitish", "master");
+    body.insert("body", "This is a release");
+
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+    let res = client.post(url).json(&body).send()?;
+    Ok(res)
+}
+
 fn get_data(url: &str, auth: header::Basic) -> Result<reqwest::Response, Box<std::error::Error>> {
     let mut headers = header::Headers::new();
-    let _auth_header = header::Authorization(auth); // how does this even work?? Is it mutating headers?
+    headers.set(header::Authorization(auth));
 
     let client = reqwest::Client::builder()
          .default_headers(headers)
@@ -74,8 +91,14 @@ fn main() {
     let url = get_url(&origin);
     let (owner, project) = get_repo_details(url);
 
-
     let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
+    let auth_string = read_ghreleaseauth();
+    let mut create_response = match create_release(&target_url, auth_string) {
+        Ok(create_response) => create_response,
+        Err(e) => panic!("Unable to create release: {}", e),
+    };
+    println!("Create response {:?}", create_response.text());
+
     let auth_string = read_ghreleaseauth();
     let mut response = match get_data(&target_url, auth_string) {
         Ok(response) => response,
