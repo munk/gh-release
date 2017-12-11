@@ -1,5 +1,6 @@
 extern crate git2;
 extern crate reqwest;
+extern crate base64;
 
 use git2::Repository;
 use git2::Remote;
@@ -8,7 +9,7 @@ use reqwest::header;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
+use base64::{encode, decode};
 
 fn get_url<'a>(origin: &'a Remote) -> Vec<&'a str> {
     let url = origin.url().map(|s| s.split(":"));
@@ -39,17 +40,22 @@ fn get_data(url: &str) -> Result<reqwest::Response, Box<std::error::Error>> {
     Ok(res)
 }
 
+fn read_line(mut reader: &mut BufReader<File>) -> String {
+    let mut buf = String::new();
+    reader.read_line(&mut buf);
+    return String::from(buf.trim())
+}
+
+
 fn read_ghreleaseauth() -> String {
     let mut home_dir: PathBuf = env::home_dir().expect("Cannot find config file!");
     home_dir.push(".ghreleaseauth");
-    let file = File::open(home_dir).expect("Unable to open file");
-    let mut reader = BufReader::new(file);
-    let mut buf = String::new();
-    let line = match reader.read_line(&mut buf) {
-        Ok(line) => line,
-        Err(e) => panic!("Failed to read file!")
-    };
-    return buf
+    let file = File::open(home_dir).expect("Unable to open file ~/.ghreleaseauth");
+    let mut reader: BufReader<File> = BufReader::new(file);
+    let username = read_line(&mut reader);
+    let password = read_line(&mut reader);
+
+    return username + &String::from(":") + &password
 }
 
 fn main() {
@@ -68,8 +74,8 @@ fn main() {
     let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
     let response = get_data(&target_url);
 
-    let filepath = read_ghreleaseauth();
-    println!("file {:?}", filepath);
+    let auth_string = encode(&read_ghreleaseauth());
+    println!("file {:?}", auth_string);
 
     println!("Hello! {}, {}, {:?}", owner, project, response)
 }
