@@ -2,8 +2,6 @@ extern crate git2;
 extern crate reqwest;
 extern crate base64;
 
-use git2::Repository;
-use git2::Remote;
 use std::env;
 use reqwest::header;
 use std::path::PathBuf;
@@ -11,23 +9,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
 
-fn get_url<'a>(origin: &'a Remote) -> Vec<&'a str> {
-    let url = origin.url().map(|s| s.split(":"));
-    let url = url.expect("No url for origin!").collect();
-    return url
-}
-
-fn get_repo_details(url: Vec<&str>) -> (&str, &str) {
-    let names: Vec<&str> = url.get(1).expect("no url data!").split("/").collect();
-    let owner = names.get(0).expect("no owner!");
-    let project: Vec<&str> = names.get(1)
-        .map(|s| s.split("."))
-        .map(|v| v.collect())
-        .expect("no project!");
-    let project = project.get(0).expect("it's borked!");
-
-    return (owner, project);
-}
+mod git;
 
 fn create_release(url: &str, auth: header::Basic) -> Result<reqwest::Response, Box<std::error::Error>> {
     let mut headers = header::Headers::new();
@@ -79,17 +61,17 @@ fn read_ghreleaseauth() -> header::Basic {
 }
 
 fn main() {
-    let repo = match Repository::open(".") {
-        Ok(repo) => repo,
-        Err(e) => panic!("failed to open: {}", e),
-    };
-    let origin = match repo.find_remote("origin") {
-        Ok(origin) => origin,
-        Err(e) => panic!("no remote named origin: {}", e),
+    let args: Vec<_> = env::args().collect();
+
+    let tag_name: Option<&String> = if args.len() > 1 {
+        Some(&args[1])
+    } else {
+        None
     };
 
-    let url = get_url(&origin);
-    let (owner, project) = get_repo_details(url);
+    println!("{:?}", tag_name);
+
+    let (owner, project) = git::remote_details();
 
     let target_url = format!("https://api.github.com/repos/{}/{}/releases", owner, project);
     let auth_string = read_ghreleaseauth();
